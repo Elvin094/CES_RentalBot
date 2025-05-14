@@ -5,7 +5,7 @@ import sqlite3
 from telebot import types
 from datetime import datetime
 
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("7972933627:AAH4obelm7ftadnjlaQV9V5z87Jt3M6coxw")
 bot = telebot.TeleBot(TOKEN)
 
 ADMIN_ID = 1341932557  # Öz Telegram ID-ni yaz
