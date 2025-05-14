@@ -7,7 +7,7 @@ from datetime import datetime
 TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN)
 
-ADMIN_ID = 123456789  # Öz Telegram ID-ni buraya əlavə et
+ADMIN_ID = @elvinseyid  # Öz Telegram ID-ni buraya əlavə et
 
 conn = sqlite3.connect("orders.db", check_same_thread=False)
 cursor = conn.cursor()
