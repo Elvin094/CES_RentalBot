@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import telebot
 import os
 import sqlite3
@@ -7,7 +8,7 @@ from datetime import datetime
 TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN)
 
-ADMIN_ID = 1341932557  # Öz Telegram ID-ni buraya əlavə et
+ADMIN_ID = 1341932557  # Öz Telegram ID-ni yaz
 
 conn = sqlite3.connect("orders.db", check_same_thread=False)
 cursor = conn.cursor()
@@ -113,14 +114,39 @@ LANGS = {
 @bot.message_handler(commands=['start'])
 def start(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("👷 Müştəri", "🏗️ Podratçı")
+    markup.add("🇦🇿 Azərbaycan dili", "🇷🇺 Русский", "🇬🇧 English")
+    bot.send_message(
+        message.chat.id,
+        "🌐 Zəhmət olmasa dili seçin:\n\n🇦🇿 Azərbaycan dili\n🇷🇺 Русский\n🇬🇧 English",
+        reply_markup=markup
+    )
+
+@bot.message_handler(func=lambda m: m.text in ["🇦🇿 Azərbaycan dili", "🇷🇺 Русский", "🇬🇧 English"])
+def select_language(message):
+    lang_code = {
+        "🇦🇿 Azərbaycan dili": "az",
+        "🇷🇺 Русский": "ru",
+        "🇬🇧 English": "en"
+    }[message.text]
+
+    user_lang[message.chat.id] = lang_code
+    l = LANGS[lang_code]
+
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(l["customer"] + " – Rol", l["contractor"] + " – Rol")
     if message.chat.id == ADMIN_ID:
-        markup.add("🛠 Admin Panel")
-    user_lang[message.chat.id] = "az"
-    bot.send_message(message.chat.id, LANGS["az"]["welcome"], reply_markup=markup)
+        markup.add(l["admin"] + " – Rol")
+
+    bot.send_message(
+        message.chat.id,
+        l["language_selected"] + "\n\n" + l["welcome"],
+        reply_markup=markup
+    )
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
+    lang = user_lang.get(message.chat.id, 'az')
+    l = LANGS[lang]
     file_info = bot.get_file(message.photo[-1].file_id)
     downloaded_file = bot.download_file(file_info.file_path)
     os.makedirs("profile_photos", exist_ok=True)
@@ -130,10 +156,13 @@ def handle_photo(message):
     cursor.execute("INSERT INTO photos (user_id, filename, created_at) VALUES (?, ?, ?)",
                    (message.chat.id, filename, datetime.now().isoformat()))
     conn.commit()
-    bot.send_message(message.chat.id, LANGS["az"]["photo_saved"])
+    bot.send_message(message.chat.id, l["photo_saved"])
+    bot.send_message(message.chat.id, l["thanks"])
 
 @bot.message_handler(content_types=['document'])
 def handle_document(message):
+    lang = user_lang.get(message.chat.id, 'az')
+    l = LANGS[lang]
     file_info = bot.get_file(message.document.file_id)
     downloaded_file = bot.download_file(file_info.file_path)
     os.makedirs("documents", exist_ok=True)
@@ -143,35 +172,37 @@ def handle_document(message):
     cursor.execute("INSERT INTO documents (user_id, filename, created_at) VALUES (?, ?, ?)",
                    (message.chat.id, message.document.file_name, datetime.now().isoformat()))
     conn.commit()
-    bot.send_message(message.chat.id, "✅ Sənəd qəbul edildi.")
+    bot.send_message(message.chat.id, l["doc_saved"])
+    bot.send_message(message.chat.id, l["thanks"])
 
 @bot.message_handler(func=lambda msg: True)
 def handle_message(message):
+    lang = user_lang.get(message.chat.id, 'az')
+    l = LANGS[lang]
     uid = message.chat.id
     text = message.text
-    l = LANGS["az"]
 
-    if text == l["customer"]:
+    if l["customer"] in text:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        markup.add("📋", "🚚", l["back"])
+        markup.add("📋 " + l["tech_list"], "🚚 " + l["delivery"], l["back"])
         bot.send_message(uid, l["welcome"], reply_markup=markup)
-    elif text == l["contractor"]:
+    elif l["contractor"] in text:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        markup.add("📤", "📎", "📑", l["back"])
+        markup.add("📤 " + l["send_equipment"], "📎 " + l["upload_doc"], "📑 " + l["send_contract"], l["back"])
         bot.send_message(uid, l["welcome"], reply_markup=markup)
-    elif text == l["admin"] and uid == ADMIN_ID:
+    elif l["admin"] in text and uid == ADMIN_ID:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        markup.add("📥", "➕", l["show_orders"], l["show_docs"], l["show_photos"], l["back"])
+        markup.add(l["show_orders"], l["show_docs"], l["show_photos"], l["back"])
         bot.send_message(uid, l["welcome"], reply_markup=markup)
-    elif text == "📋":
+    elif text == "📋 " + l["tech_list"]:
         bot.send_message(uid, l["tech_list"])
-    elif text == "🚚":
+    elif text == "🚚 " + l["delivery"]:
         bot.send_message(uid, l["delivery"])
-    elif text == "📎":
+    elif text == "📎 " + l["upload_doc"]:
         bot.send_message(uid, l["upload_doc"])
-    elif text == "📑":
+    elif text == "📑 " + l["send_contract"]:
         bot.send_message(uid, l["send_contract"])
-    elif text == "📤":
+    elif text == "📤 " + l["send_equipment"]:
         bot.send_message(uid, l["send_equipment"])
     elif text == l["show_orders"] and uid == ADMIN_ID:
         cursor.execute("SELECT username, message, created_at FROM orders ORDER BY created_at DESC LIMIT 10")
@@ -199,6 +230,7 @@ def handle_message(message):
                        (uid, message.from_user.username, text, datetime.now().isoformat()))
         conn.commit()
         bot.send_message(uid, l["order_saved"])
+        bot.send_message(uid, l["thanks"])
         bot.send_message(ADMIN_ID, f"📦 Yeni sifariş:\nGöndərən: @{message.from_user.username}\n📨 Məzmun: {text}")
 
 bot.polling(none_stop=True)
