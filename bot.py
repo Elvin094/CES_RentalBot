@@ -1,1 +1,0 @@
-# Buraya yuxarıda təqdim edilən tam Python bot kodu daxil edilir
